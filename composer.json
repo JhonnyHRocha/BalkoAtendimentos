@@ -1,0 +1,9 @@
+{
+  "name": "balko/atendimentos",
+  "description": "Atendimento UY3 independente via ClikChat",
+  "type": "project",
+  "require": {"php": "^8.3", "ext-iconv": "*", "ext-mbstring": "*", "ext-pdo": "*", "ext-pdo_sqlite": "*", "guzzlehttp/guzzle": "^7.9", "vlucas/phpdotenv": "^5.6"},
+  "autoload": {"psr-4": {"App\\": "src/"}},
+  "scripts": {"test": "php tests/run.php", "lint": "php tests/lint.php"},
+  "config": {"sort-packages": true}
+}
