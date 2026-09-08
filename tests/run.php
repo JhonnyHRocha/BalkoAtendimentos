@@ -397,7 +397,7 @@ $tests['HTTP real local: front controller, bootstrap, autenticação e persistê
     $dir=dirname(__DIR__).'/var/tests/'.bin2hex(random_bytes(8)); mkdir($dir,0700,true);
     $path=$dir.'/http.sqlite'; $port=random_int(20000,45000); $root=dirname(__DIR__);
     $env=getenv();
-    foreach (['APP_DB_PATH'=>$path,'WEBHOOK_SECRET'=>'test-only','CLIKCHAT_COMPANY_ID'=>'1','CLIKCHAT_CHANNEL_ID'=>'2',
+    foreach (['APP_ENV'=>'test','APP_DB_PATH'=>$path,'WEBHOOK_SECRET'=>'test-only','CLIKCHAT_COMPANY_ID'=>'1','CLIKCHAT_CHANNEL_ID'=>'2',
         'EXTERNAL_CALLS_ENABLED'=>'false'] as $key=>$value) { $env[$key]=$value; }
     $null=PHP_OS_FAMILY==='Windows'?'NUL':'/dev/null';
     $process=proc_open([PHP_BINARY,'-S','127.0.0.1:'.$port,'-t',$root.'/src',$root.'/src/index.php'],
@@ -441,6 +441,21 @@ $tests['janela de debounce de A não impede processamento pronto de B'] = functi
     $h->store->db->prepare('UPDATE inbox SET received_at=? WHERE conversation=?')->execute([$h->now-3,$h->key(2)]);
     $h->run(); equals($h->state(1)['state'],'start'); equals($h->state(2)['state'],'consent');
     $h->advance(2); equals($h->state(1)['state'],'consent');
+};
+$tests['preflight: configuração completa e chamadas externas desabilitadas'] = function () {
+    $r=App\Config\Preflight::inspect(testConfig(['EXTERNAL_CALLS_ENABLED'=>'false']));
+    equals($r,['missing'=>[],'invalid'=>[]]);
+};
+$tests['preflight: ausências são reportadas somente pelo nome'] = function () {
+    $r=App\Config\Preflight::inspect(testConfig(['UY3_TENANT'=>'','CLIKCHAT_TOKEN'=>'']));
+    check(in_array('UY3_TENANT',$r['missing'],true)); check(in_array('CLIKCHAT_TOKEN',$r['missing'],true));
+    check(!str_contains(json_encode($r),'test-only'));
+};
+$tests['preflight: URL com segredo e ID inválido não vazam valores'] = function () {
+    $r=App\Config\Preflight::inspect(testConfig(['UY3_BASE_URL'=>'https://test-only@host.example','CLIKCHAT_COMPANY_ID'=>'invalid-test']));
+    check(in_array('UY3_BASE_URL',$r['invalid'],true));
+    check(in_array('CLIKCHAT_COMPANY_ID',$r['invalid'],true));
+    check(!str_contains(json_encode($r),'test-only') && !str_contains(json_encode($r),'invalid-test'));
 };
 $failed=0;
 foreach ($tests as $name=>$test) {

@@ -1,0 +1,20 @@
+name: balko-atendimentos
+services:
+  web:
+    image: php:8.3-cli
+    working_dir: /app
+    command: ["php", "-S", "0.0.0.0:8080", "-t", "src", "src/index.php"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - .:/app
+    restart: unless-stopped
+
+  worker:
+    image: php:8.3-cli
+    working_dir: /app
+    command: ["php", "bin/worker.php"]
+    volumes:
+      - .:/app
+    profiles: ["integration"]
+    restart: unless-stopped

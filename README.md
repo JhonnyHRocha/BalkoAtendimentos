@@ -143,3 +143,47 @@ docker run --rm --network none --read-only -v "${PWD}:/app:ro" -w /app php:8.3-c
 ~~~
 
 Resultado e evidências em docs/auditoria-final.md. Contratos comparados em docs/referencia-legado.md. Nenhuma chamada de homologação/produção ou credencial real foi usada nesta validação.
+
+## Preparação para o teste integrado com Jhonny
+
+O .env local foi preparado com chamadas externas desabilitadas. Antes de ativar, valide sem exibir valores:
+
+~~~powershell
+docker compose run --rm --no-deps web php bin/check-config.php
+~~~
+
+O comando retorna env_loaded, external_calls_enabled e somente nomes de variáveis ausentes/inválidas. Código de saída 2 significa configuração ainda incompleta; não tente iniciar o worker nesse estado. Não use cat/Get-Content no .env em terminais compartilhados. UY3_BASE_URL precisa ser HTTPS; preserve /api conforme o servidor Digitadores.
+
+Nesta máquina, use Docker (PHP/Composer não estão no PATH). Dependências já estão instaladas em vendor. Em uma cópia nova, execute composer install com Composer/PHP disponíveis antes de subir o serviço.
+
+Iniciar somente o servidor, sem iniciar atendimento ou APIs:
+
+~~~powershell
+docker compose up -d web
+Invoke-RestMethod http://127.0.0.1:8080/health
+docker compose logs -f web
+~~~
+
+O webhook é POST /webhooks/clikchat. Configure uma URL HTTPS pública ou túnel/reverse proxy até http://127.0.0.1:8080/webhooks/clikchat e o header X-Webhook-Secret no ClikChat. Não envie o teste ao webhook antigo nem direcione a mesma integração aos dois fluxos. A porta local fica vinculada ao loopback; não é acessível diretamente ao ClikChat.
+
+Somente amanhã, após preencher as variáveis apontadas e autorizar o teste real, altere EXTERNAL_CALLS_ENABLED para true no .env pelo editor local. Então:
+
+~~~powershell
+docker compose --profile integration up -d
+docker compose restart worker
+docker compose logs -f worker
+docker compose exec worker php bin/operations.php list
+~~~
+
+Para investigar uma pendência em terminal autorizado, use show ID; reply ID TEXTO agenda resposta; resolve registra a ação/evidência. Os detalhes podem conter dados pessoais do cliente, mas não credenciais. O operador confirma a alteração bancária no Digitadores antes de payment-updated.
+
+O roteiro de teste é: mensagem inicial → SIM → CPF de teste acordado → oferta → SIM → dados → CONFIRMAR → link → assinatura/status. Para validar negociação, use VALOR/PRAZO antes do aceite. Após o cadastro, não repita a confirmação para tentar resolver indisponibilidade: consulte a pendência e reconcilie o UUID existente.
+
+Ao encerrar o teste, pare o worker, restaure EXTERNAL_CALLS_ENABLED=false e pare o servidor/túnel conforme necessário:
+
+~~~powershell
+docker compose stop worker
+docker compose stop web
+~~~
+
+Os logs de aplicação ficam em stderr, acessíveis por docker compose logs. O SQLite e as pendências permanecem em var; parar os containers não remove o estado. Os testes usam banco separado e não devem ser apontados ao banco operacional. Consulte docs/auditoria-final.md para os 22 itens e o resultado da validação.

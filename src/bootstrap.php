@@ -1,7 +1,9 @@
 <?php
 declare(strict_types=1);
 require dirname(__DIR__).'/vendor/autoload.php';
-Dotenv\Dotenv::createImmutable(dirname(__DIR__))->safeLoad();
+if (($_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? '') !== 'test') {
+    Dotenv\Dotenv::createImmutable(dirname(__DIR__))->safeLoad();
+}
 $config = App\Config\Config::environment();
 $path = $config->get('APP_DB_PATH', dirname(__DIR__).'/var/atendimento.sqlite');
 $store = new App\Models\Store($path);
