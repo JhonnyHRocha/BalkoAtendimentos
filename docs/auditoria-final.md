@@ -35,7 +35,7 @@ Comparação feita no código de BalkoAtendimentos e em operacao-clt/orquestrado
 
 ## Verificações executadas
 
-- 64/64 testes passando em PHP 8.3, com Docker --network none.
+- 70/70 testes passando em PHP 8.3, com Docker --network none.
 - Sintaxe válida em 28 arquivos PHP de src, bin e tests.
 - SQLite dos testes em tmpfs; sem uso do banco operacional.
 - .env local criado após aprovação do código/testes; carregamento validado sem imprimir conteúdo.
@@ -48,10 +48,7 @@ O teste E2E cobre cadastro bancário e PIX, valor/prazo, respostas negativas, fa
 ## Configuração pendente
 
 - WEBHOOK_SECRET
-- CLIKCHAT_COMPANY_ID
-- CLIKCHAT_CHANNEL_ID
 - CLIKCHAT_TOKEN
-- UY3_BASE_URL
 - UY3_ROBO_ID
 - UY3_USER_ID
 - UY3_TENANT
@@ -62,10 +59,20 @@ Não foram inventados valores, consultados bancos remotos ou presumidas identida
 
 ClikChat → POST /webhooks/clikchat → inbox/SQLite → worker → autorização/CPF → simulação UY3 → outbox/ClikChat → aceite e coleta → confirmação → cadastro UY3 → tarefas de link/status → outbox/ClikChat.
 
-Antes de ativar: completar as variáveis pendentes, executar bin/check-config.php, disponibilizar uma URL HTTPS do webhook acessível ao ClikChat e configurar X-Webhook-Secret. O endereço local 127.0.0.1 não é acessível pelo provedor sem túnel/reverse proxy. A base Digitadores deve ser HTTPS e usar o prefixo /api conforme o servidor.
+Antes de ativar: completar as variáveis pendentes, executar bin/check-config.php, disponibilizar uma URL HTTPS do webhook acessível ao ClikChat e configurar X-Webhook-Secret. O endereço local 127.0.0.1 não é acessível pelo provedor sem túnel/reverse proxy. A base Digitadores aceita HTTPS ou HTTP mediante UY3_ALLOW_HTTP=true, preservando o prefixo /api do servidor.
 
 Somente no início do teste autorizado: alterar EXTERNAL_CALLS_ENABLED para true e iniciar/reiniciar o worker. O teste integrado real poderá registrar uma proposta após CONFIRMAR; combinar previamente com Jhonny os dados e o ambiente apropriados. O serviço não faz cancelamento remoto automático.
 
 A fila humana é operacional por bin/operations.php: list/show/reply/resolve. Em PaymentRevision, os dados revisados ficam vinculados ao UUID; o operador atua no banco e confirma payment-updated. Se o cadastro ficar incerto, conferir antes de associate/not-created.
 
 A aprovação é de código e validação offline. Não equivale a uma homologação já realizada no ambiente externo.
+
+## Revalidacao HTTP e IDs do webhook
+
+70/70 testes offline; lint de 28 PHP aprovado. HTTP autorizado apenas para UY3 via UY3_ALLOW_HTTP=true; URL original preservada, sem credenciais embutidas, query, fragmento ou redirecionamento. ClikChat continua exigindo HTTPS.
+
+IDs positivos sao obtidos do webhook autenticado e persistidos no inbox, conversa e outbox; filtros de empresa/canal no env sao opcionais. Testes cobrem isolamento e envio pelo canal correto apos reinicio, mantendo o token autorizado para as empresas/canais atendidos.
+
+Busca offline incluiu arquivos ocultos/ignorados, configuracoes, seeds, migrations, fixtures, documentacao, scripts e inventario de dumps/backups/caches. A base SQLite local tem zero registros em integracoes e nenhuma chave ClikChat em empresas.config. Seeds e exemplos nao comprovam credenciais do ambiente de teste. Nao houve acesso ao banco remoto nem requests externos.
+
+Preflight: env carregado, chamadas externas false, nenhuma configuracao invalida e nenhuma extensao ausente. Ainda faltam WEBHOOK_SECRET, CLIKCHAT_TOKEN, UY3_ROBO_ID, UY3_USER_ID e UY3_TENANT.

@@ -457,6 +457,64 @@ $tests['preflight: URL com segredo e ID inválido não vazam valores'] = functio
     check(in_array('CLIKCHAT_COMPANY_ID',$r['invalid'],true));
     check(!str_contains(json_encode($r),'test-only') && !str_contains(json_encode($r),'invalid-test'));
 };
+$tests['UY3 HTTP explicito: fluxo completo com mocks e IDs do webhook'] = function () {
+    $h=new Harness(['UY3_BASE_URL'=>'http://digitadores.example/api','UY3_ALLOW_HTTP'=>'true','CLIKCHAT_COMPANY_ID'=>'','CLIKCHAT_CHANNEL_ID'=>'']);
+    equals(App\Config\Preflight::inspect($h->config),['missing'=>[],'invalid'=>[]]);
+    $h->register();
+    equals($h->state()['link'],'https://sign.example/test');
+    foreach($h->requests as $r) {
+        equals($r['request']->getUri()->getScheme(),$r['path']==='/api/send-message'?'https':'http');
+    }
+    equals($h->state()['route']['company'],1); equals($h->state()['route']['channel'],2);
+};
+$tests['HTTP restrito ao UY3: rejeita sem opt-in e ClikChat mesmo com opt-in'] = function () {
+    foreach(['','false'] as $flag) {
+        $h=new Harness(['UY3_BASE_URL'=>'http://digitadores.example/api','UY3_ALLOW_HTTP'=>$flag]);
+        fails(fn()=>$h->uy3->simulate(syntheticCpf()),ApiException::class); equals(count($h->requests),0);
+        check(in_array('UY3_BASE_URL',App\Config\Preflight::inspect($h->config)['invalid'],true));
+    }
+    $h=new Harness(['CLIKCHAT_BASE_URL'=>'http://chat.example','UY3_ALLOW_HTTP'=>'true']);
+    fails(fn()=>$h->http->post('CLIKCHAT','/api/send-message',[]),ApiException::class); equals(count($h->requests),0);
+    check(in_array('CLIKCHAT_BASE_URL',App\Config\Preflight::inspect($h->config)['invalid'],true));
+};
+$tests['URLs invalidas rejeitadas no runtime e preflight mesmo com HTTP explicito'] = function () {
+    foreach(['ftp://host.example','http://test-only@host.example','http://host.example?token=test-only','http://host.example#fragment','http:///api','https://host.example?x=1'] as $url) {
+        $h=new Harness(['UY3_BASE_URL'=>$url,'UY3_ALLOW_HTTP'=>'true']);
+        fails(fn()=>$h->uy3->simulate(syntheticCpf()),ApiException::class); equals(count($h->requests),0);
+        check(in_array('UY3_BASE_URL',App\Config\Preflight::inspect($h->config)['invalid'],true));
+    }
+    check(in_array('UY3_ALLOW_HTTP',App\Config\Preflight::inspect(testConfig(['UY3_ALLOW_HTTP'=>'yes']))['invalid'],true));
+};
+$tests['IDs dinamicos: isolamento, dedup e envio por canal apos reinicio'] = function () {
+    $cfg=['CLIKCHAT_COMPANY_ID'=>'','CLIKCHAT_CHANNEL_ID'=>''];$h=new Harness($cfg);$keys=[];
+    foreach([[1,2],[1,3],[2,2]] as [$company,$channel]) {
+        $p=$h->payload('oi',1,'same-id'); unset($p['empresa_id'],$p['canal_id']);
+        $p['ticket']['companyId']=$company;$p['mensagem']['whatsappId']=$channel;
+        $keys[]=Message::parse($p,$h->config)['key'];
+        check($h->webhook->handle(json_encode($p),'test-only')[1]['queued']);
+        check(!$h->webhook->handle(json_encode($p),'test-only')[1]['queued']);
+    }
+    equals(count(array_unique($keys)),3);
+    $restarted=new Harness($cfg,$h->store->path);$restarted->run();
+    equals(array_column($restarted->delivered,'whatsappId'),[2,3,2]);
+    foreach($keys as $i=>$key){$c=$restarted->store->load($key);equals($c['state'],'consent');equals($c['route']['company'],$i===2?2:1);}
+    $rows=$restarted->store->db->query('SELECT data FROM outbox')->fetchAll(PDO::FETCH_COLUMN);
+    foreach($rows as $row)check(isset(json_decode($row,true)['company']));
+};
+$tests['IDs dinamicos: webhook exige IDs positivos e autentica antes de persistir'] = function () {
+    $h=new Harness(['CLIKCHAT_COMPANY_ID'=>'','CLIKCHAT_CHANNEL_ID'=>'']);
+    foreach(['empresa_id','canal_id'] as $field) {
+        foreach([null,0,-1,'2abc','1.5',[],true,'999999999999999999999999999'] as $bad){$p=$h->payload();$p[$field]=$bad;equals($h->webhook->handle(json_encode($p),'test-only')[0],422);}
+    }
+    equals($h->webhook->handle(json_encode($h->payload()),'wrong')[0],401);
+    equals((int)$h->store->db->query('SELECT count(*) FROM inbox')->fetchColumn(),0);
+};
+$tests['Filtros opcionais independentes preservam restricao configurada'] = function () {
+    $p=(new Harness())->payload();
+    check(Message::parse($p,testConfig(['CLIKCHAT_COMPANY_ID'=>'']))!==null);
+    equals(Message::parse($p,testConfig(['CLIKCHAT_COMPANY_ID'=>'','CLIKCHAT_CHANNEL_ID'=>'99'])),null);
+    equals(Message::parse($p,testConfig(['CLIKCHAT_COMPANY_ID'=>'99','CLIKCHAT_CHANNEL_ID'=>''])),null);
+};
 $failed=0;
 foreach ($tests as $name=>$test) {
     try { $test(); echo "OK $name\n"; }

@@ -14,7 +14,7 @@ final class JsonClient
     {
         if (!$this->config->enabled()) { throw new ApiException($service, 403); }
         $base = $this->config->required($service.'_BASE_URL');
-        if (parse_url($base, PHP_URL_SCHEME) !== 'https') { throw new ApiException($service, 400); }
+        if (!$this->config->validBaseUrl($service, $base)) { throw new ApiException($service, 400); }
         $header = $service === 'UY3' ? $this->config->get('UY3_AUTH_HEADER', 'Authorization') : 'Authorization';
         $secret = $this->config->required($service === 'UY3' ? 'UY3_AUTH_TOKEN' : 'CLIKCHAT_TOKEN');
         $token = $secret;

@@ -94,7 +94,7 @@ final class Worker
                 $m = $s->fetchColumn();
                 if ($m !== false) {
                     $m = json_decode($m, true, 512, JSON_THROW_ON_ERROR);
-                    $c['route'] = array_intersect_key($m, array_flip(['key','number','channel']));
+                    $c['route'] = array_intersect_key($m, array_flip(['key','number','company','channel']));
                     $this->store->save($row['id'], $c);
                 } else {
                     $this->store->case($row['id'], 'missing_route', ['uuid'=>$c['uuid'] ?? null]);

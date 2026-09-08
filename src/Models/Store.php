@@ -67,7 +67,7 @@ final class Store
 
     public function reply(array $route, string $text): void
     {
-        $route = array_intersect_key($route, array_flip(['key','number','channel']));
+        $route = array_intersect_key($route, array_flip(['key','number','company','channel']));
         $s = $this->db->prepare('INSERT INTO outbox(conversation,data,text) VALUES(?,?,?)');
         $s->execute([$route['key'], json_encode($route, JSON_THROW_ON_ERROR), $text]);
     }

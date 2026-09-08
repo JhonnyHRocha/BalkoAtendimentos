@@ -29,9 +29,16 @@ final class Message
         foreach ([$company,$channel,$number,$id,$ticket] as $value) {
             if (!is_string($value) && !is_int($value)) { throw new \InvalidArgumentException('Identificador inválido'); }
         }
+        foreach ([$company, $channel] as $value) {
+            if (filter_var($value, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]) === false) {
+                throw new \InvalidArgumentException('Identificador de empresa/canal invalido');
+            }
+        }
         $company = (int)$company;
         $channel = (int)$channel;
-        if ($company !== (int)$config->required('CLIKCHAT_COMPANY_ID') || $channel !== (int)$config->required('CLIKCHAT_CHANNEL_ID')) { return null; }
+        foreach (['CLIKCHAT_COMPANY_ID'=>$company, 'CLIKCHAT_CHANNEL_ID'=>$channel] as $key=>$value) {
+            if ($config->get($key) !== '' && $value !== (int)$config->get($key)) { return null; }
+        }
         $number = preg_replace('/\D/', '', (string)$number);
         if (!is_string($text) || !preg_match('/^\d{10,15}$/', $number) || (string)$id === '' ||
             strlen((string)$id) > 255 || strlen($text) > 4000 || strlen((string)$ticket)>100) {
@@ -43,7 +50,7 @@ final class Message
         if (!is_string($url) || strlen($url)>2048 || !filter_var($url,FILTER_VALIDATE_URL) ||
             parse_url($url,PHP_URL_SCHEME)!=='https') { $url=null; }
         return ['key'=>hash('sha256',"$company:$channel:$number:$ticket"),'id'=>(string)$id,
-            'number'=>$number,'channel'=>$channel,'ticket'=>(string)$ticket,'text'=>trim($text),
+            'number'=>$number,'company'=>$company,'channel'=>$channel,'ticket'=>(string)$ticket,'text'=>trim($text),
             'media'=>$media,'media_url'=>$url];
     }
 }

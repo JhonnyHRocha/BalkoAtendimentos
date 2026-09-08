@@ -5,7 +5,7 @@ namespace App\Config;
 final class Preflight
 {
     public const REQUIRED = [
-        'WEBHOOK_SECRET','CLIKCHAT_COMPANY_ID','CLIKCHAT_CHANNEL_ID','CLIKCHAT_BASE_URL','CLIKCHAT_TOKEN',
+        'WEBHOOK_SECRET','CLIKCHAT_BASE_URL','CLIKCHAT_TOKEN',
         'UY3_BASE_URL','UY3_AUTH_TOKEN','UY3_ROBO_ID','UY3_USER_ID','UY3_TENANT',
     ];
 
@@ -23,11 +23,9 @@ final class Preflight
         }
         foreach (['CLIKCHAT_BASE_URL','UY3_BASE_URL'] as $key) {
             $v = $config->get($key);
-            if ($v !== '' && (!filter_var($v,FILTER_VALIDATE_URL) || parse_url($v,PHP_URL_SCHEME)!=='https' ||
-                parse_url($v,PHP_URL_USER)!==null || parse_url($v,PHP_URL_PASS)!==null ||
-                parse_url($v,PHP_URL_QUERY)!==null || parse_url($v,PHP_URL_FRAGMENT)!==null)) { $invalid[]=$key; }
+            if ($v !== '' && !$config->validBaseUrl(str_replace('_BASE_URL', '', $key), $v)) { $invalid[]=$key; }
         }
-        foreach (['EXTERNAL_CALLS_ENABLED','UY3_AUTH_BEARER'] as $key) {
+        foreach (['EXTERNAL_CALLS_ENABLED','UY3_AUTH_BEARER','UY3_ALLOW_HTTP'] as $key) {
             if (!in_array($config->get($key), ['', 'false','true'], true)) { $invalid[]=$key; }
         }
         foreach (['HTTP_TIMEOUT','OUTBOX_MAX_ATTEMPTS','LINK_INTERVAL_SECONDS','LINK_MAX_ATTEMPTS',

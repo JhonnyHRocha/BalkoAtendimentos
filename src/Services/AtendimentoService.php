@@ -19,7 +19,7 @@ final class AtendimentoService
     public function process(array $m, array &$c, ?int $now = null): string
     {
         $now ??= time();
-        $c['route'] = array_intersect_key($m, array_flip(['key','number','channel']));
+        $c['route'] = array_intersect_key($m, array_flip(['key','number','company','channel']));
         $text = trim($m['text']);
         $command = Text::normalize($text);
         if ($c['state'] === 'submitting') { $this->uncertain($m['key'], $c, ['code'=>'interrupted_registration']); }

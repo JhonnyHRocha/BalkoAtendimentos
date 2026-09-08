@@ -54,12 +54,13 @@ ATENDENTE cria pendência operacional e pausa a coleta automática. Áudio/image
 | APP_ENV | Identificação operacional do ambiente |
 | APP_DB_PATH | var/atendimento.sqlite dentro do projeto |
 | WEBHOOK_SECRET | Segredo obrigatório de entrada |
-| CLIKCHAT_COMPANY_ID | Empresa permitida |
-| CLIKCHAT_CHANNEL_ID | Canal permitido |
+| CLIKCHAT_COMPANY_ID | Filtro opcional de empresa; ID recebido no webhook |
+| CLIKCHAT_CHANNEL_ID | Filtro opcional de canal; envio usa o ID da conversa |
 | CLIKCHAT_BASE_URL | Origem HTTPS do ClikChat, sem /api |
 | CLIKCHAT_TOKEN | Token de envio |
 | CLIKCHAT_ORIGIN | assistente_virtual |
-| UY3_BASE_URL | Base HTTPS dos Digitadores; incluir /api conforme instalação |
+| UY3_BASE_URL | Base dos Digitadores; HTTPS ou HTTP com UY3_ALLOW_HTTP=true; preservar /api |
+| UY3_ALLOW_HTTP | Opt-in exclusivo para HTTP no UY3; false por padrao |
 | UY3_AUTH_HEADER | Authorization |
 | UY3_AUTH_TOKEN | Token Digitadores |
 | UY3_AUTH_BEARER | true normaliza Bearer em Authorization; false preserva token |
@@ -152,7 +153,7 @@ O .env local foi preparado com chamadas externas desabilitadas. Antes de ativar,
 docker compose run --rm --no-deps web php bin/check-config.php
 ~~~
 
-O comando retorna env_loaded, external_calls_enabled e somente nomes de variáveis ausentes/inválidas. Código de saída 2 significa configuração ainda incompleta; não tente iniciar o worker nesse estado. Não use cat/Get-Content no .env em terminais compartilhados. UY3_BASE_URL precisa ser HTTPS; preserve /api conforme o servidor Digitadores.
+O comando retorna env_loaded, external_calls_enabled e somente nomes de variáveis ausentes/inválidas. Código de saída 2 significa configuração ainda incompleta; não tente iniciar o worker nesse estado. Não use cat/Get-Content no .env em terminais compartilhados. UY3_BASE_URL aceita HTTPS ou HTTP com UY3_ALLOW_HTTP=true; preserve /api conforme o servidor Digitadores.
 
 Nesta máquina, use Docker (PHP/Composer não estão no PATH). Dependências já estão instaladas em vendor. Em uma cópia nova, execute composer install com Composer/PHP disponíveis antes de subir o serviço.
 
@@ -187,3 +188,9 @@ docker compose stop web
 ~~~
 
 Os logs de aplicação ficam em stderr, acessíveis por docker compose logs. O SQLite e as pendências permanecem em var; parar os containers não remove o estado. Os testes usam banco separado e não devem ser apontados ao banco operacional. Consulte docs/auditoria-final.md para os 22 itens e o resultado da validação.
+
+### IDs por conversa e UY3 HTTP
+
+CLIKCHAT_COMPANY_ID e CLIKCHAT_CHANNEL_ID sao filtros opcionais. Sem esses filtros, o webhook autenticado exige IDs positivos em empresa_id/ticket.companyId e canal_id/mensagem.whatsappId. Ambos ficam persistidos; o envio usa whatsappId da conversa. Configure um CLIKCHAT_TOKEN autorizado para a empresa/canais atendidos; IDs recebidos nao concedem acesso a outras empresas.
+
+HTTPS permanece o padrao. Apenas UY3 aceita HTTP com UY3_ALLOW_HTTP=true, para reproduzir o endpoint do legado. Essa opcao permite trafego sem TLS nesse endpoint; nao altera a URL, nao permite redirecionamentos e nao habilita chamadas externas. Mantenha EXTERNAL_CALLS_ENABLED=false durante a preparacao.
