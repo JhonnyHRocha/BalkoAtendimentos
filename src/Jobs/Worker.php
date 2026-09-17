@@ -79,7 +79,7 @@ final class Worker
         $text = $message['text'];
         return !preg_match('/audio|ptt|image|video|document/i', $message['media']) &&
             !\App\Services\Text::human($text) && !\App\Services\Text::no($text) &&
-            !\App\Services\Text::yes($text) &&
+            !\App\Services\Text::yes($text) && !\App\Services\CustomerQuestions::detects($text) &&
             !in_array(\App\Services\Text::normalize($text), ['corrigir','confirmar','confirmo','link','status'], true);
     }
     private function recover(int $now): void
@@ -151,7 +151,7 @@ final class Worker
                 ]);
                 if (isset($c['route'])) { $this->store->reply($c['route'], 'Não foi possível concluir a consulta de '.$task['kind'].'. A equipe recebeu uma pendência para verificar.'); }
             } elseif ($result['text'] !== null && isset($c['route'])) {
-                $this->store->reply($c['route'], $result['text']);
+                $this->store->reply($c['route'] + ['buttons'=>\App\Services\ConversationMessages::buttons($c)], $result['text']);
             }
             if (($c['proposal_status']['revision'] ?? false) && $c['state'] === 'payment_collect') {
                 $this->store->case($task['conversation'], 'payment_revision', [

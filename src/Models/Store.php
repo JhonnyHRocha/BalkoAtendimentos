@@ -67,7 +67,7 @@ final class Store
 
     public function reply(array $route, string $text): void
     {
-        $route = array_intersect_key($route, array_flip(['key','number','company','channel']));
+        $route = array_intersect_key($route, array_flip(['key','number','company','channel','buttons']));
         $s = $this->db->prepare('INSERT INTO outbox(conversation,data,text) VALUES(?,?,?)');
         $s->execute([$route['key'], json_encode($route, JSON_THROW_ON_ERROR), $text]);
     }
@@ -76,7 +76,7 @@ final class Store
     {
         $this->transaction(function () use ($id, $m, $c, $text) {
             $this->save($m['key'], $c);
-            if ($text !== '') { $this->reply($m, $text); }
+            if ($text !== '') { $this->reply($m + ['buttons'=>\App\Services\ConversationMessages::buttons($c)], $text); }
             $s = $this->db->prepare('UPDATE inbox SET done=1 WHERE id=?');
             foreach ((array)$id as $entryId) { $s->execute([$entryId]); }
         });

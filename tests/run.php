@@ -515,6 +515,54 @@ $tests['Filtros opcionais independentes preservam restricao configurada'] = func
     equals(Message::parse($p,testConfig(['CLIKCHAT_COMPANY_ID'=>'','CLIKCHAT_CHANNEL_ID'=>'99'])),null);
     equals(Message::parse($p,testConfig(['CLIKCHAT_COMPANY_ID'=>'99','CLIKCHAT_CHANNEL_ID'=>''])),null);
 };
+$tests['botoes persistem na outbox e usam contrato ClikChat apos reinicio'] = function () {
+    $h=new Harness();$h->receive('oi');$h->scripts['send']=[new Response(503)];$h->run();
+    $row=$h->store->db->query('SELECT data FROM outbox LIMIT 1')->fetchColumn();
+    $buttons=json_decode($row,true)['buttons'];equals(array_column($buttons,'id'),['SIM','NÃO']);
+    $other=new Harness([],$h->store->path);$other->now=$h->now+1000;$other->run();
+    equals($other->delivered[0]['buttons'],$buttons);
+    foreach($buttons as $b){equals($b['type'],'reply');equals($b['title'],$b['displayText']);check(mb_strlen($b['title'])<=20);}
+    check(str_contains($other->delivered[0]['body'],"\n\n"));
+};
+$tests['botoes de oferta ajuste e confirmacao executam comandos'] = function () {
+    $h=new Harness();$h->offer();$out=end($h->delivered);
+    check(str_contains($out['body'],"\n*Prazo:*"));equals(array_column($out['buttons'],'id'),['SIM','AJUSTAR','NÃO']);
+    $h->send('Ajustar oferta');equals($h->state()['state'],'accept');check(str_contains(end($h->delivered)['body'],'VALOR 2000'));
+    $h->send('Sim, quero');equals($h->state()['state'],'collect');
+    $h=new Harness();$h->collect();$h->send('oi');equals(array_column(end($h->delivered)['buttons'],'id'),['CONFIRMAR','CORRIGIR','CANCELAR']);
+    $h->send('Confirmar');equals($h->count('cadastrar-proposta'),1);
+};
+$tests['duvida sobre oferta preserva dados e retoma campo pendente'] = function () {
+    $h=new Harness();$h->offer();$h->send('SIM');$before=$h->state();$count=count($h->requests);
+    $h->send('Qual o valor da parcela?');equals($h->state(),$before);
+    $out=end($h->delivered)['body'];check(str_contains($out,'*Valor da parcela:*'));check(str_ends_with($out,Fields::QUESTIONS['nome']));
+    equals($h->count('cadastrar-proposta'),0);equals(count($h->requests),$count+1);
+    $h->send('Pessoa Teste');equals($h->state()['data']['nome'],'Pessoa Teste');
+};
+$tests['duvida antes do CPF nao autoriza nem consulta sem consentimento'] = function () {
+    $h=new Harness();$h->send('oi');$h->send('Por que precisa do CPF?');equals($h->state()['state'],'consent');equals($h->count('simulacao-completa'),0);
+    check(str_contains(end($h->delivered)['body'],'confirmação final'));
+    $h->send('Autorizar');equals($h->state()['state'],'cpf');$h->send('Quando recebo?');equals($h->state()['state'],'cpf');
+    check(str_ends_with(end($h->delivered)['body'],'Informe seu CPF com 11 dígitos.'));
+};
+$tests['duvida desconhecida permite resposta humana sem apagar coleta'] = function () {
+    $h=new Harness();$h->offer();$h->send('SIM');$before=$h->state();$h->send('Qual a taxa de juros?');equals($h->state(),$before);
+    $cases=$h->cases('customer_question');equals(count($cases),1);$ops=new Operations($h->store);
+    $ops->reply((int)$cases[0]['id'],'Resposta conferida pela equipe.');$h->run();
+    $ops->resolve((int)$cases[0]['id'],'answered','Dúvida respondida');equals($h->state(),$before);
+    equals(count($h->cases('customer_question')),0);
+};
+$tests['debounce nao mistura pergunta com dado de outra mensagem'] = function () {
+    $h=new Harness();$h->offer();$h->send('SIM');
+    $h->receive('Qual o valor da parcela?');$h->receive('Pessoa Teste');$h->run();
+    equals($h->state()['data']['nome'],'Pessoa Teste');equals(Fields::next($h->state()['data']),'data_nascimento');
+    check(str_contains($h->delivered[count($h->delivered)-2]['body'],'*Valor da parcela:*'));
+};
+$tests['duvida na revisao preserva UUID e dados sem novo cadastro'] = function () {
+    $h=new Harness();$h->register();$c=$h->state();$c['state']='payment_collect';foreach(Fields::PAYMENT_FIELDS as $f)unset($c['data'][$f]);$h->store->save($h->key(),$c);
+    $h->send('Posso usar conta de outra pessoa?');equals($h->state()['uuid'],$c['uuid']);equals($h->state()['data'],$c['data']);equals($h->count('cadastrar-proposta'),1);
+    check(str_contains(end($h->delivered)['body'],'própria titularidade'));equals(array_column(end($h->delivered)['buttons'],'id'),['PIX','CONTA']);
+};
 $failed=0;
 foreach ($tests as $name=>$test) {
     try { $test(); echo "OK $name\n"; }

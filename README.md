@@ -194,3 +194,9 @@ Os logs de aplicação ficam em stderr, acessíveis por docker compose logs. O S
 CLIKCHAT_COMPANY_ID e CLIKCHAT_CHANNEL_ID sao filtros opcionais. Sem esses filtros, o webhook autenticado exige IDs positivos em empresa_id/ticket.companyId e canal_id/mensagem.whatsappId. Ambos ficam persistidos; o envio usa whatsappId da conversa. Configure um CLIKCHAT_TOKEN autorizado para a empresa/canais atendidos; IDs recebidos nao concedem acesso a outras empresas.
 
 HTTPS permanece o padrao. Apenas UY3 aceita HTTP com UY3_ALLOW_HTTP=true, para reproduzir o endpoint do legado. Essa opcao permite trafego sem TLS nesse endpoint; nao altera a URL, nao permite redirecionamentos e nao habilita chamadas externas. Mantenha EXTERNAL_CALLS_ENABLED=false durante a preparacao.
+
+### Mensagens e dúvidas durante a coleta
+
+As mensagens de boas-vindas e oferta usam parágrafos e campos em linhas separadas. Consentimento, oferta, confirmação e escolha PIX/CONTA enviam botões reply no contrato ClikChat (title, displayText e id), persistidos na outbox. Respostas por texto continuam aceitas.
+
+Dúvidas reconhecidas são respondidas com informações do fluxo e da oferta salva, repetindo o campo pendente sem avançar a coleta. Perguntas sem resposta prevista criam pendência customer_question: use operations.php list/show/reply e resolve ID answered EVIDENCIA. Isso não pausa nem reinicia a coleta. O cliente pode optar por aguardar ou continuar. Não há IA generativa; não se inventam taxas, prazos de pagamento ou respostas desconhecidas.

@@ -29,6 +29,14 @@ final class AtendimentoService
         }
         if ($c['state'] === 'review') { return 'A pendência de cadastro foi registrada para conferência. Não faremos outro cadastro até o operador verificar a proposta.'; }
         if ($c['state'] === 'human') { return 'Sua mensagem está registrada na fila do atendente. Aguarde o retorno da equipe.'; }
+        if (in_array($c['state'], ['consent','cpf','accept','collect','confirm','payment_collect','payment_confirm'], true) && CustomerQuestions::detects($text)) {
+            $answer = CustomerQuestions::answer($text, $c);
+            if ($answer === null) {
+                $this->store->case($m['key'], 'customer_question', ['question'=>$text,'pending_state'=>$c['state']]);
+                $answer = 'Registrei sua dúvida para a equipe esclarecer. Você pode aguardar a resposta ou continuar informando os dados abaixo.';
+            }
+            return $answer."\n\n".ConversationMessages::prompt($c);
+        }
         // Qualquer UUID existente impede a entrada no caminho de cadastro.
         if (isset($c['uuid'])) { return $this->existing($m, $c, $now); }
         if (Text::no($text)) {
@@ -43,7 +51,7 @@ final class AtendimentoService
         }
         if ($c['state'] === 'start') {
             $c['state'] = 'consent';
-            return 'Olá! Para consultar uma oferta de crédito CLT na UY3, precisamos consultar seu CPF. Você autoriza? Responda SIM ou NÃO. Pode solicitar ATENDENTE a qualquer momento.';
+            return "Olá!\n\nPara consultar uma oferta de crédito CLT na UY3, precisamos consultar seu CPF.\n\nVocê autoriza? Responda SIM ou NÃO.\n\nPode solicitar ATENDENTE a qualquer momento.";
         }
         if ($c['state'] === 'consent') {
             if (!Text::yes($text)) { return 'Você autoriza a consulta? Responda SIM ou NÃO.'; }
@@ -71,6 +79,7 @@ final class AtendimentoService
         }
         if ($c['state'] === 'simulation_retry') { return 'A consulta será repetida automaticamente. Avisaremos assim que houver retorno. Você também pode solicitar ATENDENTE.'; }
         if ($c['state'] === 'accept') {
+            if (in_array($command, ['ajustar','ajustar oferta','quero outro valor'], true)) { return "*Ajustar oferta*\n\nEnvie VALOR seguido do valor desejado (exemplo: VALOR 2000).\nOu envie PRAZO seguido das parcelas (exemplo: PRAZO 12)."; }
             if (!Text::yes($text)) { return 'Responda SIM para continuar, NÃO para recusar, VALOR 2000 para ajustar o valor ou PRAZO 12 para ajustar o prazo.'; }
             $c['state'] = 'collect';
             return Fields::QUESTIONS[Fields::next($c['data'])];
@@ -188,11 +197,11 @@ final class AtendimentoService
         $c['offer'] = $outcome['offer'];
         $c['state'] = 'accept';
         $offer = $c['offer'];
-        $text = 'Oferta UY3: R$ '.number_format($offer['value'],2,',','.').' em '.$offer['term'].' parcelas de R$ '.number_format($offer['payment'],2,',','.').'.';
-        if (!empty($offer['first_payment'])) { $text .= ' Primeiro desconto: '.substr((string)$offer['first_payment'],0,10).'.'; }
-        if (!empty($offer['product'])) { $text .= ' Tabela: '.$offer['product'].'.'; }
-        if (isset($c['requested_term']) && $c['requested_term'] !== $offer['term']) { $text .= ' O prazo solicitado não estava disponível; esta é a alternativa retornada.'; }
-        return $text.' Deseja continuar? Responda SIM ou NÃO. Para ajustar, envie VALOR seguido do valor ou PRAZO seguido das parcelas.';
+        $text = ConversationMessages::offer($offer);
+        if (isset($c['requested_term']) && $c['requested_term'] !== $offer['term']) {
+            $text .= "\n\nO prazo solicitado não estava disponível; esta é a alternativa retornada.";
+        }
+        return $text."\n\n".ConversationMessages::prompt($c);
     }
 
     private function register(string $key, array &$c, int $now): string

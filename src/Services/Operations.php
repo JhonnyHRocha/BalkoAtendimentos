@@ -84,6 +84,8 @@ final class Operations
                     $c['state'] = 'simulation_retry';
                 }
                 $this->store->schedule($key, $kind, time(), true);
+            } elseif ($action === 'answered') {
+                if ($case['kind'] !== 'customer_question') { throw new \InvalidArgumentException('Ação exclusiva para dúvidas'); }
             } elseif ($action === 'resume') {
                 if ($c['state'] !== 'human' || in_array($c['resume_state'] ?? '', ['review','submitting'], true)) {
                     throw new \InvalidArgumentException('Não é permitido retomar este estado sem reconciliação');

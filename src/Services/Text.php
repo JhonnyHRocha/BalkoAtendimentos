@@ -14,7 +14,7 @@ final class Text
     public static function yes(string $text): bool
     {
         return in_array(self::normalize($text), [
-            'sim', 's', 'aceito', 'aceitar', 'autorizo', 'concordo', 'pode sim',
+            'sim', 'sim quero', 'autorizar', 's', 'aceito', 'aceitar', 'autorizo', 'concordo', 'pode sim',
             'sim autorizo', 'sim aceito', 'quero', 'quero sim', 'pode continuar',
         ], true);
     }
@@ -22,7 +22,7 @@ final class Text
     public static function no(string $text): bool
     {
         return in_array(self::normalize($text), [
-            'nao', 'n', 'nao quero', 'nao aceito', 'nao autorizo', 'nao obrigado',
+            'nao', 'nao autorizar', 'n', 'nao quero', 'nao aceito', 'nao autorizo', 'nao obrigado',
             'nao obrigada', 'recuso', 'recusar', 'cancelar', 'cancela', 'sem interesse',
         ], true);
     }
